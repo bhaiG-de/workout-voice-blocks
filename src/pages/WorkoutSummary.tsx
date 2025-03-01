@@ -1,11 +1,10 @@
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { WorkoutBlock } from "@/components/ui-blocks/WorkoutBlock";
-import { mockFunctions, Block, Workout } from "@/lib/supabase";
+import { supabaseFunctions, Block, Workout } from "@/lib/supabase";
 import { ChevronLeft, Clock, Calendar, TimerOff, Dumbbell } from "lucide-react";
 
 const WorkoutSummary = () => {
@@ -21,11 +20,11 @@ const WorkoutSummary = () => {
       try {
         if (!workoutId) return;
         
-        // In a real app, these would be actual Supabase calls
-        const { data: workoutData, error: workoutError } = await mockFunctions.getWorkout(workoutId);
+        // Use real Supabase functions
+        const { data: workoutData, error: workoutError } = await supabaseFunctions.getWorkout(workoutId);
         if (workoutError) throw new Error(workoutError.message);
         
-        const { data: blocksData, error: blocksError } = await mockFunctions.getBlocks(workoutId);
+        const { data: blocksData, error: blocksError } = await supabaseFunctions.getBlocks(workoutId);
         if (blocksError) throw new Error(blocksError.message);
         
         setWorkout(workoutData);
@@ -124,7 +123,7 @@ const WorkoutSummary = () => {
           
           <h1 className="text-2xl font-bold mb-2">Workout Summary</h1>
           <p className="text-muted-foreground">
-            {workout.title || 'Untitled Workout'}
+            Workout Session
           </p>
         </header>
         

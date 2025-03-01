@@ -1,29 +1,48 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Play, Clock } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { mockFunctions } from "@/lib/supabase";
+import { supabaseFunctions, supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const [workoutHistory, setWorkoutHistory] = useState([]);
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Mock workout history
-  const workoutHistory = [
-    { id: 'history-1', title: 'Morning Strength', date: '2023-05-15', blocks: 12 },
-    { id: 'history-2', title: 'Evening Cardio', date: '2023-05-14', blocks: 8 },
-    { id: 'history-3', title: 'Full Body Workout', date: '2023-05-12', blocks: 15 },
-  ];
+  // Fetch workout history
+  useEffect(() => {
+    const fetchWorkoutHistory = async () => {
+      try {
+        // In a real app, you would fetch from Supabase
+        // This would be a query to get recent workouts for the current user
+        const { data, error } = await supabase
+          .from('workouts')
+          .select('*')
+          .order('started_at', { ascending: false })
+          .limit(5);
+          
+        if (error) throw error;
+        setWorkoutHistory(data || []);
+      } catch (error) {
+        console.error('Error fetching workout history:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load workout history",
+          variant: "destructive",
+        });
+      }
+    };
+    
+    fetchWorkoutHistory();
+  }, [toast]);
 
   const startNewWorkout = async () => {
     setIsLoading(true);
     try {
-      // In a real app, this would use the actual user ID
-      const { data, error } = await mockFunctions.startWorkout('user-1');
+      const { data, error } = await supabaseFunctions.startWorkout();
       
       if (error) {
         throw new Error(error.message);
@@ -92,28 +111,34 @@ const Index = () => {
         <section>
           <h2 className="text-2xl font-semibold mb-4">Recent Workouts</h2>
           <div className="grid gap-4">
-            {workoutHistory.map((workout, index) => (
-              <Card 
-                key={workout.id} 
-                className="workout-card cursor-pointer hover:bg-secondary/10"
-                onClick={() => navigate(`/workouts/${workout.id}/summary`)}
-                style={{ 
-                  animationDelay: `${index * 100}ms`,
-                }}
-              >
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">{workout.title}</CardTitle>
-                  <CardDescription>
-                    {new Date(workout.date).toLocaleDateString()}
-                  </CardDescription>
-                </CardHeader>
-                <CardFooter>
-                  <div className="text-sm text-muted-foreground">
-                    {workout.blocks} workout moments
-                  </div>
-                </CardFooter>
+            {workoutHistory.length === 0 ? (
+              <Card className="p-6 text-center text-muted-foreground">
+                No workout history yet. Start your first workout!
               </Card>
-            ))}
+            ) : (
+              workoutHistory.map((workout, index) => (
+                <Card 
+                  key={workout.id} 
+                  className="workout-card cursor-pointer hover:bg-secondary/10"
+                  onClick={() => navigate(`/workouts/${workout.id}/summary`)}
+                  style={{ 
+                    animationDelay: `${index * 100}ms`,
+                  }}
+                >
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg">Workout Session</CardTitle>
+                    <CardDescription>
+                      {new Date(workout.started_at).toLocaleDateString()}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardFooter>
+                    <div className="text-sm text-muted-foreground">
+                      {workout.blocks?.length || 0} workout moments
+                    </div>
+                  </CardFooter>
+                </Card>
+              ))
+            )}
           </div>
         </section>
       </div>

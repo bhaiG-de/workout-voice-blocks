@@ -1,4 +1,3 @@
-
 import { Block } from "./supabase";
 
 // This is a mock implementation of the AI service
@@ -54,7 +53,7 @@ const generateMockQuestionBlock = (workoutId: string): Omit<Block, 'id' | 'creat
 const generateMockNoteBlock = (workoutId: string): Omit<Block, 'id' | 'created_at'> => {
   return {
     workout_id: workoutId,
-    block_type: 'made_note',
+    block_type: 'made_a_note',
     block_data: {
       note: 'I feel stronger today compared to last week. My endurance has improved significantly.'
     }

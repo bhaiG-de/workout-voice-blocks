@@ -1,16 +1,16 @@
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { VoiceRecorder } from "@/components/VoiceRecorder";
 import { WorkoutBlock } from "@/components/ui-blocks/WorkoutBlock";
-import { mockFunctions, Block, Workout } from "@/lib/supabase";
-import { processVoiceNote } from "@/lib/ai-service";
+import { supabaseFunctions, Block, Workout } from "@/lib/supabase";
+import { processVoiceNote } from "@/services/voiceProcessing";
 import { ChevronLeft, Clock, CheckCircle2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const WorkoutPage = () => {
+  console.log('🏋️‍♂️ Rendering WorkoutPage');
   const { workoutId } = useParams<{ workoutId: string }>();
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [blocks, setBlocks] = useState<Block[]>([]);
@@ -22,20 +22,24 @@ const WorkoutPage = () => {
 
   useEffect(() => {
     const fetchWorkout = async () => {
+      console.group('📥 Fetching Workout Data');
+      console.log('Workout ID:', workoutId);
       try {
         if (!workoutId) return;
         
-        // In a real app, these would be actual Supabase calls
-        const { data: workoutData, error: workoutError } = await mockFunctions.getWorkout(workoutId);
+        // Use real Supabase functions
+        const { data: workoutData, error: workoutError } = await supabaseFunctions.getWorkout(workoutId);
         if (workoutError) throw new Error(workoutError.message);
+        console.log('✅ Workout data:', workoutData);
         
-        const { data: blocksData, error: blocksError } = await mockFunctions.getBlocks(workoutId);
+        const { data: blocksData, error: blocksError } = await supabaseFunctions.getBlocks(workoutId);
         if (blocksError) throw new Error(blocksError.message);
+        console.log('✅ Blocks data:', blocksData);
         
         setWorkout(workoutData);
         setBlocks(blocksData);
       } catch (error) {
-        console.error('Error fetching workout:', error);
+        console.error('❌ Error fetching workout:', error);
         toast({
           title: "Error",
           description: "Failed to load workout data",
@@ -43,6 +47,7 @@ const WorkoutPage = () => {
         });
       } finally {
         setIsLoading(false);
+        console.groupEnd();
       }
     };
     
@@ -50,22 +55,64 @@ const WorkoutPage = () => {
   }, [workoutId, toast]);
 
   const handleVoiceNote = async (file: File) => {
-    if (!workoutId || !workout) return;
+    console.group('🎤 Processing Voice Note');
+    console.log('File:', file);
+    console.log('Workout ID:', workoutId);
+    console.log('Current workout:', workout);
+    
+    if (!workoutId || !workout) {
+      console.error('❌ Missing workout data');
+      console.groupEnd();
+      return;
+    }
     
     setIsProcessing(true);
     try {
       // 1. Upload the voice note to Supabase storage
-      const { data: uploadData, error: uploadError } = await mockFunctions.uploadVoiceNote(file, workout.user_id);
+      console.log('📤 Uploading voice note to Supabase storage...');
+      const { data: uploadData, error: uploadError } = await supabaseFunctions.uploadVoiceNote(file, workoutId);
       if (uploadError) throw new Error(uploadError.message);
+      console.log('✅ Upload successful:', uploadData);
       
       // 2. Process the voice note with the AI
-      const aiResponse = await processVoiceNote(uploadData.publicUrl, workoutId);
+      console.log('🤖 Processing with AI...');
+      const aiResponse = await processVoiceNote(uploadData.publicUrl);
+      console.log('✅ AI Processing complete:', aiResponse);
       
       // 3. Save the new blocks to Supabase
-      const { data: newBlocksData, error: saveError } = await mockFunctions.saveBlocks(aiResponse.blocks);
-      if (saveError) throw new Error(saveError.message);
+      console.log('💾 Saving blocks...');
+      const blocksWithWorkoutId = aiResponse.blocks.map(block => ({
+        ...block,
+        workout_id: workoutId
+      }));
       
-      // 4. Update the UI with the new blocks
+      const { data: newBlocksData, error: saveError } = await supabaseFunctions.saveBlocks(blocksWithWorkoutId);
+      if (saveError) throw new Error(saveError.message);
+      console.log('✅ Blocks saved:', newBlocksData);
+      
+      // 4. Update the workout's blocks array with the new block IDs
+      if (newBlocksData && newBlocksData.length > 0) {
+        console.log('📝 Updating workout blocks array...');
+        const newBlockIds = newBlocksData.map(block => block.id);
+        const { error: updateError } = await supabaseFunctions.updateWorkoutBlocks(workoutId, newBlockIds);
+        
+        if (updateError) {
+          console.error('❌ Error updating workout blocks:', updateError);
+          throw new Error(updateError.message);
+        }
+        console.log('✅ Workout blocks updated with IDs:', newBlockIds);
+        
+        // Update the local workout state with the new blocks
+        setWorkout(prevWorkout => {
+          if (!prevWorkout) return null;
+          return {
+            ...prevWorkout,
+            blocks: [...prevWorkout.blocks, ...newBlockIds]
+          };
+        });
+      }
+      
+      // 5. Update the UI with the new blocks
       setBlocks(prevBlocks => [...prevBlocks, ...newBlocksData as Block[]]);
       
       toast({
@@ -73,7 +120,7 @@ const WorkoutPage = () => {
         description: "Your voice note has been processed",
       });
     } catch (error) {
-      console.error('Error processing voice note:', error);
+      console.error('❌ Error processing voice note:', error);
       toast({
         title: "Error",
         description: "Failed to process your voice note",
@@ -81,15 +128,16 @@ const WorkoutPage = () => {
       });
     } finally {
       setIsProcessing(false);
+      console.groupEnd();
     }
   };
 
-  const finishWorkout = async () => {
+  const handleFinishWorkout = async () => {
     if (!workoutId) return;
     
     setIsFinishing(true);
     try {
-      const { data, error } = await mockFunctions.finishWorkout(workoutId);
+      const { data, error } = await supabaseFunctions.finishWorkout(workoutId);
       if (error) throw new Error(error.message);
       
       toast({
@@ -97,12 +145,13 @@ const WorkoutPage = () => {
         description: "Your workout has been saved",
       });
       
+      // Navigate to the summary page
       navigate(`/workouts/${workoutId}/summary`);
     } catch (error) {
       console.error('Error finishing workout:', error);
       toast({
         title: "Error",
-        description: "Failed to finish your workout",
+        description: "Failed to finish workout",
         variant: "destructive",
       });
     } finally {
@@ -219,7 +268,7 @@ const WorkoutPage = () => {
         <div className="flex justify-center mb-8">
           <Button 
             size="lg" 
-            onClick={finishWorkout}
+            onClick={handleFinishWorkout}
             disabled={isFinishing || blocks.length === 0}
             className="w-full sm:w-auto animate-scale-in"
           >
