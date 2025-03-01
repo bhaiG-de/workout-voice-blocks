@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Mic, Square, Loader2, RefreshCw } from "lucide-react";
@@ -26,6 +25,20 @@ export function VoiceRecorder({ onRecordingComplete, isProcessing }: VoiceRecord
     }
   };
 
+  // Determine if we're in a processing state (either converting audio or API processing)
+  const isConverting = status === 'processing';
+  const isInProcessingState = isConverting || isProcessing;
+  
+  // Get appropriate status message
+  const getStatusMessage = () => {
+    if (isConverting) return "Converting audio...";
+    if (isProcessing) return "Processing with AI...";
+    if (status === 'recording') return "Recording...";
+    if (status === 'inactive' && !audioUrl) return "Record your workout";
+    if (status === 'inactive' && audioUrl) return "Ready to submit";
+    return "";
+  };
+
   return (
     <Card className="glass-panel">
       <CardContent className="p-6 flex flex-col items-center">
@@ -41,7 +54,7 @@ export function VoiceRecorder({ onRecordingComplete, isProcessing }: VoiceRecord
           >
             {status === 'recording' ? (
               <Mic className="h-8 w-8" />
-            ) : status === 'processing' ? (
+            ) : isInProcessingState ? (
               <Loader2 className="h-8 w-8 animate-spin" />
             ) : (
               <Mic className="h-8 w-8" />
@@ -50,22 +63,19 @@ export function VoiceRecorder({ onRecordingComplete, isProcessing }: VoiceRecord
 
           {/* Status text */}
           <div className="text-center">
-            {status === 'inactive' && !audioUrl && (
-              <p className="text-lg font-medium mb-2">Record your workout</p>
-            )}
-            {status === 'recording' && (
-              <p className="text-lg font-medium mb-2 text-red-500">Recording...</p>
-            )}
-            {status === 'processing' && (
-              <p className="text-lg font-medium mb-2">Processing...</p>
-            )}
-            {status === 'inactive' && audioUrl && (
-              <p className="text-lg font-medium mb-2">Ready to submit</p>
-            )}
+            <p className="text-lg font-medium mb-2">
+              {isConverting && <span className="text-amber-500">Converting audio...</span>}
+              {isProcessing && <span className="text-blue-500">Processing with AI...</span>}
+              {status === 'recording' && <span className="text-red-500">Recording...</span>}
+              {status === 'inactive' && !audioUrl && "Record your workout"}
+              {status === 'inactive' && audioUrl && !isProcessing && "Ready to submit"}
+            </p>
             <p className="text-sm text-muted-foreground">
               {status === 'inactive' && !audioUrl && "Speak clearly about what you've done"}
               {status === 'recording' && "Tap stop when you're finished"}
-              {status === 'inactive' && audioUrl && "Submit your recording or try again"}
+              {isConverting && "Converting to WAV format for better compatibility"}
+              {isProcessing && "Your recording is being analyzed"}
+              {status === 'inactive' && audioUrl && !isProcessing && "Submit your recording or try again"}
             </p>
           </div>
 
@@ -113,6 +123,7 @@ export function VoiceRecorder({ onRecordingComplete, isProcessing }: VoiceRecord
                   className="w-full"
                   variant="outline"
                   size="lg"
+                  disabled={isProcessing}
                 >
                   <RefreshCw className="mr-2 h-4 w-4" />
                   Record Again
@@ -123,7 +134,7 @@ export function VoiceRecorder({ onRecordingComplete, isProcessing }: VoiceRecord
                   className="w-full"
                   variant="default"
                   size="lg"
-                  disabled={isProcessing}
+                  disabled={isInProcessingState}
                 >
                   {isProcessing ? (
                     <>

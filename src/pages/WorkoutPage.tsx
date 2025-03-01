@@ -57,6 +57,9 @@ const WorkoutPage = () => {
   const handleVoiceNote = async (file: File) => {
     console.group('🎤 Processing Voice Note');
     console.log('File:', file);
+    console.log('File type:', file.type);
+    console.log('File name:', file.name);
+    console.log('File size:', file.size, 'bytes');
     console.log('Workout ID:', workoutId);
     console.log('Current workout:', workout);
     
@@ -90,40 +93,38 @@ const WorkoutPage = () => {
       if (saveError) throw new Error(saveError.message);
       console.log('✅ Blocks saved:', newBlocksData);
       
-      // 4. Update the workout's blocks array with the new block IDs
+      // 4. Update the workout.blocks array with the new block IDs
       if (newBlocksData && newBlocksData.length > 0) {
-        console.log('📝 Updating workout blocks array...');
         const newBlockIds = newBlocksData.map(block => block.id);
-        const { error: updateError } = await supabaseFunctions.updateWorkoutBlocks(workoutId, newBlockIds);
+        console.log('🔄 Updating workout.blocks with new block IDs:', newBlockIds);
         
+        const { data: updatedWorkout, error: updateError } = await supabaseFunctions.updateWorkoutBlocks(workoutId, newBlockIds);
         if (updateError) {
           console.error('❌ Error updating workout blocks:', updateError);
           throw new Error(updateError.message);
         }
-        console.log('✅ Workout blocks updated with IDs:', newBlockIds);
+        console.log('✅ Workout blocks updated:', updatedWorkout);
         
-        // Update the local workout state with the new blocks
-        setWorkout(prevWorkout => {
-          if (!prevWorkout) return null;
-          return {
-            ...prevWorkout,
-            blocks: [...prevWorkout.blocks, ...newBlockIds]
-          };
-        });
+        // Update the local workout state with the updated blocks array
+        if (updatedWorkout) {
+          setWorkout(updatedWorkout);
+        }
       }
       
-      // 5. Update the UI with the new blocks
-      setBlocks(prevBlocks => [...prevBlocks, ...newBlocksData as Block[]]);
+      // 5. Update the local blocks state
+      if (newBlocksData) {
+        setBlocks(prevBlocks => [...prevBlocks, ...newBlocksData]);
+      }
       
       toast({
-        title: "Success",
-        description: "Your voice note has been processed",
+        title: "Voice note processed",
+        description: `Added ${aiResponse.blocks.length} new block(s) to your workout.`,
       });
     } catch (error) {
       console.error('❌ Error processing voice note:', error);
       toast({
-        title: "Error",
-        description: "Failed to process your voice note",
+        title: "Error processing voice note",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
         variant: "destructive",
       });
     } finally {

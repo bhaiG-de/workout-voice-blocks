@@ -89,18 +89,34 @@ export const supabaseFunctions = {
   },
   
   uploadVoiceNote: async (file: File, workoutId: string) => {
+    // Log file information
+    console.log('📤 Uploading file:', {
+      name: file.name,
+      type: file.type,
+      size: file.size
+    });
+    
+    // Ensure the file has the correct extension for its type
+    let fileName = file.name;
+    if (file.type === 'audio/wav' && !fileName.endsWith('.wav')) {
+      fileName = fileName.replace(/\.[^/.]+$/, '') + '.wav';
+      console.log('📝 Renamed file to ensure .wav extension:', fileName);
+    }
+    
     // Create a unique file path with timestamp and workout ID
-    const filePath = `${workoutId}/${Date.now()}_${file.name}`;
+    const filePath = `${workoutId}/${Date.now()}_${fileName}`;
     
     // Upload to the workout_recordings bucket
     const { data, error } = await supabase.storage
       .from('workout_recordings')
       .upload(filePath, file, {
         cacheControl: '3600',
-        upsert: false
+        upsert: false,
+        contentType: file.type // Explicitly set the content type
       });
       
     if (error) {
+      console.error('❌ Upload error:', error);
       return { data: null, error };
     }
     
@@ -108,7 +124,8 @@ export const supabaseFunctions = {
     const { data: { publicUrl } } = supabase.storage
       .from('workout_recordings')
       .getPublicUrl(filePath);
-      
+    
+    console.log('✅ File uploaded successfully:', publicUrl);
     return { data: { publicUrl }, error: null };
   },
   
