@@ -217,5 +217,84 @@ export const supabaseFunctions = {
       .single();
       
     return { data, error };
+  },
+  
+  getExerciseCatalogue: async (searchTerm: string = '', limit: number = 10) => {
+    try {
+      let query = supabase
+        .from('exercise_catalogue')
+        .select('name, exercise_catalogue_id')
+        .order('name', { ascending: true });
+        
+      if (searchTerm) {
+        query = query.ilike('name', `%${searchTerm}%`);
+      }
+      
+      const { data, error } = await query.limit(limit);
+      
+      if (error) {
+        console.error('Error fetching exercise catalogue:', error);
+        return { data: [], error };
+      }
+      
+      // Ensure we return an array even if data is null
+      return { data: Array.isArray(data) ? data : [], error: null };
+    } catch (err) {
+      console.error('Unexpected error in getExerciseCatalogue:', err);
+      return { data: [], error: err as Error };
+    }
+  },
+  
+  getExerciseById: async (exerciseCatalogueId: string) => {
+    try {
+      if (!exerciseCatalogueId) {
+        console.error('Invalid exercise catalogue ID');
+        return { data: null, error: new Error('Invalid exercise catalogue ID') };
+      }
+      
+      const { data, error } = await supabase
+        .from('exercise_catalogue')
+        .select('name, exercise_catalogue_id')
+        .eq('exercise_catalogue_id', exerciseCatalogueId)
+        .single();
+        
+      if (error) {
+        console.error('Error fetching exercise by ID:', error);
+        return { data: null, error };
+      }
+      
+      return { data, error: null };
+    } catch (err) {
+      console.error('Unexpected error in getExerciseById:', err);
+      return { data: null, error: err as Error };
+    }
+  },
+  
+  updateBlockData: async (blockId: string, blockData: any) => {
+    try {
+      if (!blockId) {
+        console.error('Invalid block ID');
+        return { data: null, error: new Error('Invalid block ID') };
+      }
+      
+      const { data, error } = await supabase
+        .from('blocks')
+        .update({ 
+          block_data: blockData,
+        })
+        .eq('id', blockId)
+        .select()
+        .single();
+        
+      if (error) {
+        console.error('Error updating block data:', error);
+        return { data: null, error };
+      }
+      
+      return { data, error: null };
+    } catch (err) {
+      console.error('Unexpected error in updateBlockData:', err);
+      return { data: null, error: err as Error };
+    }
   }
 };

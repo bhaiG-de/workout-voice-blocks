@@ -2,6 +2,7 @@ interface BlockData {
   exercises: Array<{
     exercise_id: string;
     exercise_name: string;
+    exercise_catalogue_id?: string;
     sets: Array<{
       weight: number;
       reps: number;
