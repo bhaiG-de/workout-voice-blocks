@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, User, Session, AuthChangeEvent } from '@supabase/supabase-js';
 
 // Debug logging
 console.log('Environment variables:', {
@@ -28,6 +28,7 @@ export type Workout = {
   blocks: string[];
   created_at: string;
   updated_at: string;
+  user_id: string | null;
 }
 
 export type Block = {
@@ -38,14 +39,50 @@ export type Block = {
   created_at: string;
 }
 
+// Authentication functions
+export const authFunctions = {
+  signUp: async (email: string, password: string) => {
+    return await supabase.auth.signUp({
+      email,
+      password,
+    });
+  },
+
+  signIn: async (email: string, password: string) => {
+    return await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+  },
+
+  signOut: async () => {
+    return await supabase.auth.signOut();
+  },
+
+  getCurrentUser: async () => {
+    return await supabase.auth.getUser();
+  },
+
+  getSession: async () => {
+    return await supabase.auth.getSession();
+  },
+
+  onAuthStateChange: (callback: (event: AuthChangeEvent, session: Session | null) => void) => {
+    return supabase.auth.onAuthStateChange((event, session) => {
+      callback(event, session);
+    });
+  }
+};
+
 // Real Supabase functions
 export const supabaseFunctions = {
-  startWorkout: async () => {
+  startWorkout: async (userId: string | null = null) => {
     // Create a new workout object that matches the actual database schema
     const newWorkout = {
       started_at: new Date().toISOString(),
       ended_at: null,
-      blocks: []
+      blocks: [],
+      user_id: userId
     };
     
     const { data, error } = await supabase
@@ -63,6 +100,16 @@ export const supabaseFunctions = {
       .select('*')
       .eq('id', workoutId)
       .single();
+      
+    return { data, error };
+  },
+  
+  getUserWorkouts: async (userId: string) => {
+    const { data, error } = await supabase
+      .from('workouts')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
       
     return { data, error };
   },

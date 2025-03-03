@@ -3,26 +3,26 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Play, Clock } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabaseFunctions, supabase } from "@/lib/supabase";
+import { supabaseFunctions, Workout } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { UserProfile } from "@/components/UserProfile";
+import { useAuth } from "@/lib/AuthContext";
 
 const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [workoutHistory, setWorkoutHistory] = useState([]);
+  const [workoutHistory, setWorkoutHistory] = useState<Workout[]>([]);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   // Fetch workout history
   useEffect(() => {
     const fetchWorkoutHistory = async () => {
+      if (!user) return;
+      
       try {
-        // In a real app, you would fetch from Supabase
-        // This would be a query to get recent workouts for the current user
-        const { data, error } = await supabase
-          .from('workouts')
-          .select('*')
-          .order('started_at', { ascending: false })
-          .limit(5);
+        // Fetch workouts for the current user
+        const { data, error } = await supabaseFunctions.getUserWorkouts(user.id);
           
         if (error) throw error;
         setWorkoutHistory(data || []);
@@ -37,24 +37,26 @@ const Index = () => {
     };
     
     fetchWorkoutHistory();
-  }, [toast]);
+  }, [toast, user]);
 
   const startNewWorkout = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabaseFunctions.startWorkout();
+      // Pass the user ID when starting a new workout
+      const { data, error } = await supabaseFunctions.startWorkout(user?.id || null);
       
       if (error) {
         throw new Error(error.message);
       }
       
-      // Navigate to the workout page
-      navigate(`/workouts/${data.id}`);
+      if (data) {
+        navigate(`/workouts/${data.id}`);
+      }
     } catch (error) {
       console.error('Error starting workout:', error);
       toast({
         title: "Error",
-        description: "Failed to start a new workout. Please try again.",
+        description: "Failed to start a new workout",
         variant: "destructive",
       });
     } finally {
@@ -62,85 +64,100 @@ const Index = () => {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-background">
-      <div className="container py-8 px-4 mx-auto max-w-4xl">
-        <header className="mb-8 text-center">
-          <h1 className="text-4xl font-bold mb-2 tracking-tight">Fitness Tracker</h1>
-          <p className="text-muted-foreground max-w-md mx-auto">
-            Record your workouts with voice notes and get AI-powered insights
-          </p>
-        </header>
+  // Format date for display
+  const formatDate = (dateString: string) => {
+    const options: Intl.DateTimeFormatOptions = { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    };
+    return new Date(dateString).toLocaleDateString(undefined, options);
+  };
 
-        <section className="mb-12">
-          <Card className="glass-panel animate-fade-in">
+  // Calculate workout duration
+  const calculateDuration = (startDate: string, endDate: string | null) => {
+    if (!endDate) return "In progress";
+    
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const durationMs = end.getTime() - start.getTime();
+    
+    const minutes = Math.floor(durationMs / (1000 * 60));
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    
+    if (hours > 0) {
+      return `${hours}h ${remainingMinutes}m`;
+    }
+    return `${minutes}m`;
+  };
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Workout Voice Blocks</h1>
+        <UserProfile />
+      </div>
+      
+      <div className="grid gap-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Start a New Workout</CardTitle>
+            <CardDescription>
+              Begin tracking your workout with voice commands
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Record your exercises, ask questions, and make notes using your voice during your workout.
+            </p>
+          </CardContent>
+          <CardFooter>
+            <Button 
+              onClick={startNewWorkout} 
+              disabled={isLoading}
+              className="w-full"
+            >
+              <Play className="mr-2 h-4 w-4" />
+              {isLoading ? "Starting..." : "Start Workout"}
+            </Button>
+          </CardFooter>
+        </Card>
+
+        {workoutHistory.length > 0 && (
+          <Card>
             <CardHeader>
-              <CardTitle>Start Your Fitness Journey</CardTitle>
+              <CardTitle>Recent Workouts</CardTitle>
               <CardDescription>
-                Begin a new workout session and track your progress
+                Your workout history
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-40 flex items-center justify-center bg-secondary/40 rounded-lg">
-                <div className="text-center">
-                  <p className="text-lg mb-3">Ready to get started?</p>
-                  <Button 
-                    size="lg"
-                    onClick={startNewWorkout}
-                    disabled={isLoading}
-                    className="animate-scale-in"
+              <div className="space-y-4">
+                {workoutHistory.map((workout) => (
+                  <div 
+                    key={workout.id} 
+                    className="flex justify-between items-center p-3 border rounded-lg hover:bg-accent cursor-pointer"
+                    onClick={() => navigate(`/workouts/${workout.id}/summary`)}
                   >
-                    {isLoading ? (
-                      <span className="flex items-center">
-                        <Clock className="mr-2 h-4 w-4 animate-spin" />
-                        Starting...
-                      </span>
-                    ) : (
-                      <span className="flex items-center">
-                        <Play className="mr-2 h-4 w-4" />
-                        Start New Workout
-                      </span>
-                    )}
-                  </Button>
-                </div>
+                    <div>
+                      <p className="font-medium">{formatDate(workout.started_at)}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {workout.blocks?.length || 0} blocks recorded
+                      </p>
+                    </div>
+                    <div className="flex items-center text-muted-foreground">
+                      <Clock className="mr-1 h-4 w-4" />
+                      <span>{calculateDuration(workout.started_at, workout.ended_at)}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
-        </section>
-
-        <section>
-          <h2 className="text-2xl font-semibold mb-4">Recent Workouts</h2>
-          <div className="grid gap-4">
-            {workoutHistory.length === 0 ? (
-              <Card className="p-6 text-center text-muted-foreground">
-                No workout history yet. Start your first workout!
-              </Card>
-            ) : (
-              workoutHistory.map((workout, index) => (
-                <Card 
-                  key={workout.id} 
-                  className="workout-card cursor-pointer hover:bg-secondary/10"
-                  onClick={() => navigate(`/workouts/${workout.id}/summary`)}
-                  style={{ 
-                    animationDelay: `${index * 100}ms`,
-                  }}
-                >
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">Workout Session</CardTitle>
-                    <CardDescription>
-                      {new Date(workout.started_at).toLocaleDateString()}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardFooter>
-                    <div className="text-sm text-muted-foreground">
-                      {workout.blocks?.length || 0} workout moments
-                    </div>
-                  </CardFooter>
-                </Card>
-              ))
-            )}
-          </div>
-        </section>
+        )}
       </div>
     </div>
   );
